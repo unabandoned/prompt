@@ -5,81 +5,66 @@
  *
  */
 
-var stream = require('stream'),
-    util = require('util'),
+var PassThrough = require('node:stream').PassThrough,
     prompt = require('../lib/prompt');
 
 var helpers = exports;
 
-var MockReadWriteStream = helpers.MockReadWriteStream = function () {
-  //
-  // No need to do anything here, it's just a mock.
-  //
-  var self = this;
-  this.on('pipe', function (src) {
-    var _emit = src.emit;
-    src.emit = function () {
-      //console.dir(arguments);
-      _emit.apply(src, arguments);
-    };
-
-    src.on('data', function (d) {
-      self.emit('data', d + '');
-    })
-  })
-};
-
-util.inherits(MockReadWriteStream, stream.Stream);
-
-['resume', 'pause', 'setEncoding', 'flush', 'end'].forEach(function (method) {
-  MockReadWriteStream.prototype[method] = function () { /* Mock */ };
-});
-
-MockReadWriteStream.prototype.write = function (msg) {
-  this.emit('data', msg);
-  return true;
-};
-
-MockReadWriteStream.prototype.writeNextTick = function (msg) {
-  var self = this
-  process.nextTick(function () {
-    self.write(msg);
-  });
-};
+helpers.stdin = new PassThrough();
+helpers.stdout = new PassThrough();
+helpers.stdout.setEncoding('utf8');
 
 //
-// Create some mock streams for asserting against
-// in our prompt teSts.
+// Answer each upcoming prompt with the next of `lines`, one per `prompt`
+// event, so every answer reaches the readline interface that asked for it.
 //
-helpers.stdin = new MockReadWriteStream();
-helpers.stdout = new MockReadWriteStream();
-helpers.stderr = new MockReadWriteStream();
-
-//
-// Because `read` uses a `process.nextTick` for reading from
-// stdin, it is necessary to write sequences of input with extra
-// `process.nextTick` calls
-//
-helpers.stdin.writeSequence = function (lines) {
-  if (!lines || !lines.length) {
-    return;
+helpers.answer = function (lines) {
+  lines = lines.slice();
+  function next() {
+    if (!lines.length) {
+      prompt.removeListener('prompt', onPrompt);
+      return;
+    }
+    helpers.stdin.write(lines.shift());
   }
+  function onPrompt() {
+    setImmediate(next);
+  }
+  prompt.on('prompt', onPrompt);
+};
 
-  helpers.stdin.writeNextTick(lines.shift());
-  prompt.once('prompt', function () {
-    process.nextTick(function () {
-      helpers.stdin.writeSequence(lines);
+//
+// Collect what prompt writes to its output stream, and what its logger writes
+// to process.stderr (where validation errors go), while `fn` runs. stdout is
+// left alone: the test runner reports through it.
+//
+helpers.capture = async function (fn) {
+  var out = '',
+      err = '',
+      onData = function (d) { out += d; },
+      stderrWrite = process.stderr.write;
+
+  helpers.stdout.on('data', onData);
+  process.stderr.write = function (c) { err += c; return true; };
+  try {
+    var result = await fn();
+    return { result: result, out: out, err: err };
+  } finally {
+    process.stderr.write = stderrWrite;
+    helpers.stdout.removeListener('data', onData);
+  }
+};
+
+//
+// Run `prompt.get` (or any callback-style call) as a promise.
+//
+helpers.call = function (fn) {
+  return new Promise(function (resolve, reject) {
+    fn(function (err, result) {
+      return err ? reject(err) : resolve(result);
     });
   });
-}
-
-//
-// Monkey punch `util.error` to silence console output
-// and redirect to helpers.stderr for testing.
-//
-process.stderr.write = function () {
-  helpers.stderr.write.apply(helpers.stderr, arguments);
-}
+};
 
 // 1) .properties
 // 2) warning --> message
@@ -166,12 +151,6 @@ helpers.schema = {
         return line.slice(0,2) == 'fn';
       },
       message: 'fnconform must start with "fn"'
-    }/*,
-    cbvalidator: {
-      conform: function (line, next) {
-        next(line.slice(0,2) == 'cb');
-      },
-      message: 'cbvalidator must start with "cb"'
-    }*/
+    }
   }
 };
