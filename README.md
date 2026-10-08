@@ -1,4 +1,22 @@
-# prompt [![Build Status](https://secure.travis-ci.org/flatiron/prompt.svg)](http://travis-ci.org/flatiron/prompt) [![Npm package version](https://img.shields.io/npm/v/prompt.svg?maxAge=2592000)](https://npmjs.com/package/prompt)
+# prompt
+
+> **This is a maintained fork of [prompt][upstream], published as
+> [`@unabandoned/prompt`][pkg].** Upstream's last release was 1.3.0 in 2022.
+> The API is unchanged and it has no runtime dependencies: line reading uses
+> `node:readline` instead of `read`, the logger and colours are built in instead
+> of `winston` and `@colors/colors`, and `revalidator` is vendored in-tree.
+> Requires Node.js 22.12 or later. See [.unabandoned.yml](.unabandoned.yml).
+>
+> To keep `require('prompt')` working unchanged, install it under its original
+> name with an npm alias: `npm install prompt@npm:@unabandoned/prompt`.
+>
+> `prompt.logger` is now a small built-in logger with the same CLI levels
+> (`error`, `warn`, `help`, `data`, `info`, `debug`, `prompt`, `verbose`,
+> `input`, `silly`), a `level` threshold and `log(level, ...)`, rather than a
+> winston `Logger`.
+
+[upstream]: https://github.com/flatiron/prompt
+[pkg]: https://www.npmjs.com/package/@unabandoned/prompt
 
 
 A beautiful command-line prompt for node.js
@@ -103,7 +121,7 @@ Pretty easy right? The output from the above script is:
 ```
 
 ## Valid Property Settings
-`prompt` understands JSON-schema with a few extra parameters and uses [revalidator](https://github.com/flatiron/revalidator) for validation.
+`prompt` understands JSON-schema with a few extra parameters and uses [revalidator](https://github.com/flatiron/revalidator) (vendored in `lib/revalidator.js`) for validation.
 
 Here's an overview of the properties that may be used for validation and prompting controls:
 
@@ -452,7 +470,7 @@ By default, prompt prompt binds a process-killing event handler to the SIGINT ev
 ## Installation
 
 ``` bash
-  $ [sudo] npm install prompt
+  $ npm install @unabandoned/prompt
 ```
 
 ## Running tests
